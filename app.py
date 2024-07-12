@@ -22,9 +22,9 @@ far_text = load_far_document()
 
 # Create the model
 generation_config = {
-    "temperature": 0,
+    "temperature": 0.1,
     "top_p": 0.95,
-    "top_k": 64,
+    # "top_k": 64,
     "max_output_tokens": 8192,
 }
 
@@ -104,6 +104,11 @@ scroll_script = """
 </script>
 """
 
+
+
+
+
+
 # Streamlit UI
 
 # Initialize session state
@@ -116,11 +121,18 @@ if 'introduced' not in st.session_state:
 
 st.title("Federal Acquisition Regulation (FAR) Chat Assistant")
 
-# Add a sidebar for debugging
+# Add a sidebar for debugging and the clear button
 with st.sidebar:
     st.header("Debugging Information")
     st.subheader("Full Conversation History")
     st.json(st.session_state.conversation_history)
+    
+    # Move the clear button to the sidebar
+    if st.button("Clear Conversation"):
+        st.session_state.conversation_history = []
+        st.session_state.summary = ""
+        st.session_state.introduced = False
+        st.rerun()
 
 # Chat container
 chat_container = st.container()
@@ -159,17 +171,10 @@ if prompt := st.chat_input("Ask a question about FAR:"):
             for chunk in chat_with_far(prompt):
                 full_response += chunk
                 message_placeholder.markdown(full_response)
-                # Scroll down after each response chunk
-                st.markdown(scroll_script, unsafe_allow_html=True)
 
+            # Scroll down after each response chunk
+            st.markdown(scroll_script, unsafe_allow_html=True)
     # Check if we need to summarize (every 20 messages)
     if len(st.session_state.conversation_history) % 20 == 0:
         st.session_state.summary = summarize_conversation()
-        st.experimental_rerun()  # Rerun the app to display the summary
-
-# Add a button to clear the conversation
-if st.button("Clear Conversation"):
-    st.session_state.conversation_history = []
-    st.session_state.summary = ""
-    st.session_state.introduced = False
-    st.rerun()
+        st.experimental_rerun()  # Rerun
