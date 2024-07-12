@@ -1,6 +1,28 @@
-Based on this file:{far_text}
+Far file content :
+{far_text}
+End of far file content.
+_____________________________________________________
 
-Conversation summary:{summary}
 
-Recent conversation:
-{recent_conversation}
+
+History of conversation:
+{conversation_history}
+end of History of conversation.
+_____________________________________________________
+
+
+
+User query:
+{query}
+end of User query.
+_____________________________________________________
+
+
+Instruction:
+Based on the far file content, recent conversation and user query:
+- Provide an accuracy answer to the user query
+- Always provide accurate information(important info verbatim in quotation) and cite the relevant FAR sections.
+
+
+Asistant:
+Here is my highly accurate answer based on the FAR file content, recent conversation and user query, with citations to the relevant FAR sections:

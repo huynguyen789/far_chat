@@ -10,7 +10,6 @@ def load_prompt(filename):
         return file.read().strip()
 
 api_key = st.secrets["GOOGLE_API_KEY"]
-# Configure the Google Generative AI
 genai.configure(api_key=api_key)
 
 # Load FAR document
@@ -29,23 +28,19 @@ generation_config = {
     "max_output_tokens": 8192,
 }
 
+system_instruction = load_prompt("system_instruction.txt")
+
 model = genai.GenerativeModel(
     model_name="gemini-1.5-flash",
     generation_config=generation_config,
-    system_instruction=load_prompt("system_instruction.txt")
+    system_instruction=system_instruction
 )
 
-# Initialize session state
-if 'messages' not in st.session_state:
-    st.session_state.messages = []
-if 'summary' not in st.session_state:
-    st.session_state.summary = ""
-
 def chat_with_far(query):
+    # Prepare the full context for the model
     full_context = load_prompt("chat_content.txt").format(
         far_text=far_text,
-        summary=st.session_state.summary,
-        recent_conversation="\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]]),
+        conversation_history="\n".join(st.session_state.conversation_history),
         query=query
     )
     
@@ -57,17 +52,22 @@ def chat_with_far(query):
         full_response += content
         yield content
     
+    # Add the query and response to the conversation history
+    st.session_state.conversation_history.append({"role": "human", "content": query})
+    st.session_state.conversation_history.append({"role": "assistant", "content": full_response})
+    
+    # Limit the conversation history to the last 10 exchanges
+    if len(st.session_state.conversation_history) > 20:
+        st.session_state.conversation_history = st.session_state.conversation_history[-20:]
+    
     return full_response
 
 def summarize_conversation():
     summary_prompt = load_prompt("summary_prompt.txt").format(
-        conversation=' '.join([f"{m['role']}: {m['content']}" for m in st.session_state.messages])
-    )
+        conversation=st.session_state.conversation_history)
 
     summary_response = model.generate_content(summary_prompt)
     return summary_response.text
-
-
 
 # JavaScript code to scroll to the bottom
 scroll_script = """
@@ -81,7 +81,22 @@ scroll_script = """
 """
 
 # Streamlit UI
+
+# Initialize session state
+if 'conversation_history' not in st.session_state:
+    st.session_state.conversation_history = []
+if 'summary' not in st.session_state:
+    st.session_state.summary = ""
+if 'introduced' not in st.session_state:
+    st.session_state.introduced = False
+
 st.title("Federal Acquisition Regulation (FAR) Chat Assistant")
+
+# Add a sidebar for debugging
+with st.sidebar:
+    st.header("Debugging Information")
+    st.subheader("Full Conversation History")
+    st.json(st.session_state.conversation_history)
 
 # Chat container
 chat_container = st.container()
@@ -92,18 +107,24 @@ with chat_container:
         with st.expander("Conversation Summary", expanded=False):
             st.markdown(st.session_state.summary)
     
-    for message in st.session_state.messages:
+    for message in st.session_state.conversation_history:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+# Introduction message
+if not st.session_state.introduced:
+    with chat_container:
+        with st.chat_message("assistant"):
+            intro_message = "Hello! I'm your Federal Acquisition Regulation (FAR) Chat Assistant. I'm here to help you navigate and understand the Federal Acquisition Regulation. Feel free to ask me any questions about FAR, and I'll do my best to provide accurate and helpful information. How can I assist you today?"
+            st.markdown(intro_message)
+            st.session_state.conversation_history.append({"role": "assistant", "content": intro_message})
+    st.session_state.introduced = True
+
 # User input
 if prompt := st.chat_input("Ask a question about FAR:"):
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    
     # Display user message in chat message container
     with chat_container:
-        with st.chat_message("user"):
+        with st.chat_message("human"):
             st.markdown(prompt)
 
     # Generate and display assistant response
@@ -113,25 +134,18 @@ if prompt := st.chat_input("Ask a question about FAR:"):
             full_response = ""
             for chunk in chat_with_far(prompt):
                 full_response += chunk
-                message_placeholder.markdown(full_response + "▌")
+                message_placeholder.markdown(full_response)
                 # Scroll down after each response chunk
                 st.markdown(scroll_script, unsafe_allow_html=True)
-            message_placeholder.markdown(full_response)
-    
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
 
     # Check if we need to summarize (every 20 messages)
-    if len(st.session_state.messages) % 20 == 0:
+    if len(st.session_state.conversation_history) % 20 == 0:
         st.session_state.summary = summarize_conversation()
-        st.session_state.messages = []  # Clear the message history
         st.experimental_rerun()  # Rerun the app to display the summary
 
 # Add a button to clear the conversation
 if st.button("Clear Conversation"):
-    st.session_state.messages = []
+    st.session_state.conversation_history = []
     st.session_state.summary = ""
+    st.session_state.introduced = False
     st.rerun()
-
-
-
