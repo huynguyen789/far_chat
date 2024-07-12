@@ -38,9 +38,10 @@ model = genai.GenerativeModel(
 
 def chat_with_far(query):
     # Prepare the full context for the model
+    conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
     full_context = load_prompt("chat_content.txt").format(
         far_text=far_text,
-        conversation_history="\n".join(st.session_state.conversation_history),
+        conversation_history=conversation_string,
         query=query
     )
     
@@ -63,8 +64,8 @@ def chat_with_far(query):
     return full_response
 
 def summarize_conversation():
-    summary_prompt = load_prompt("summary_prompt.txt").format(
-        conversation=st.session_state.conversation_history)
+    conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
+    summary_prompt = load_prompt("summary_prompt.txt").format(conversation=conversation_string)
 
     summary_response = model.generate_content(summary_prompt)
     return summary_response.text
