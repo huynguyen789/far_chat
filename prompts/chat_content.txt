@@ -1,0 +1,6 @@
+Based on this file:{far_text}
+
+Conversation summary:{summary}
+
+Recent conversation:
+{recent_conversation}

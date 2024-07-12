@@ -1,0 +1,137 @@
+import os
+import streamlit as st
+import google.generativeai as genai
+from streamlit.components.v1 import html
+
+# Function to load prompts from files
+def load_prompt(filename):
+    prompt_path = os.path.join(os.path.dirname(__file__), "prompts", filename)
+    with open(prompt_path, "r") as file:
+        return file.read().strip()
+
+api_key = st.secrets["GOOGLE_API_KEY"]
+# Configure the Google Generative AI
+genai.configure(api_key=api_key)
+
+# Load FAR document
+@st.cache_resource
+def load_far_document():
+    with open('/Users/huyknguyen/Desktop/redhorse/code_projects/far_chat/docs/FAR_28-39.rtf', 'r') as file:
+        return file.read()
+
+far_text = load_far_document()
+
+# Create the model
+generation_config = {
+    "temperature": 0,
+    "top_p": 0.95,
+    "top_k": 64,
+    "max_output_tokens": 8192,
+}
+
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    generation_config=generation_config,
+    system_instruction=load_prompt("system_instruction.txt")
+)
+
+# Initialize session state
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+if 'summary' not in st.session_state:
+    st.session_state.summary = ""
+
+def chat_with_far(query):
+    full_context = load_prompt("chat_content.txt").format(
+        far_text=far_text,
+        summary=st.session_state.summary,
+        recent_conversation="\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]]),
+        query=query
+    )
+    
+    response = model.generate_content(full_context, stream=True)
+    
+    full_response = ""
+    for chunk in response:
+        content = chunk.text
+        full_response += content
+        yield content
+    
+    return full_response
+
+def summarize_conversation():
+    summary_prompt = load_prompt("summary_prompt.txt").format(
+        conversation=' '.join([f"{m['role']}: {m['content']}" for m in st.session_state.messages])
+    )
+
+    summary_response = model.generate_content(summary_prompt)
+    return summary_response.text
+
+
+
+# JavaScript code to scroll to the bottom
+scroll_script = """
+<script>
+    function scrollToBottom() {
+        var chatContainer = parent.document.querySelector('section.main');
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+    scrollToBottom();
+</script>
+"""
+
+# Streamlit UI
+st.title("Federal Acquisition Regulation (FAR) Chat Assistant")
+
+# Chat container
+chat_container = st.container()
+
+# Display chat messages
+with chat_container:
+    if st.session_state.summary:
+        with st.expander("Conversation Summary", expanded=False):
+            st.markdown(st.session_state.summary)
+    
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+# User input
+if prompt := st.chat_input("Ask a question about FAR:"):
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    # Display user message in chat message container
+    with chat_container:
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+    # Generate and display assistant response
+    with chat_container:
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            full_response = ""
+            for chunk in chat_with_far(prompt):
+                full_response += chunk
+                message_placeholder.markdown(full_response + "▌")
+                # Scroll down after each response chunk
+                st.markdown(scroll_script, unsafe_allow_html=True)
+            message_placeholder.markdown(full_response)
+    
+    # Add assistant response to chat history
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+    # Check if we need to summarize (every 20 messages)
+    if len(st.session_state.messages) % 20 == 0:
+        st.session_state.summary = summarize_conversation()
+        st.session_state.messages = []  # Clear the message history
+        st.experimental_rerun()  # Rerun the app to display the summary
+
+# Add a button to clear the conversation
+if st.button("Clear Conversation"):
+    st.session_state.messages = []
+    st.session_state.summary = ""
+    st.rerun()
+
+
+

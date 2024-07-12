@@ -1,0 +1,28 @@
+#What:
+- An app that you can chat with the FAR doc.
+
+Why:
+- To help users to find the information they need in the FAR doc.
+- Test and learn about the gemini cache.
+
+Potential Solutions:
+- RAG
+- Gemini cache
+
+Why:
+Gemini cache
+- Testing & gaining ability to use the gemini cache
+- Testing compaing: speed, accuracy, cost, user experience, scalability.
+
+What a success product looks like:
+- A nice UI that uses can ask questions and get answers from the FAR doc. 
+- Fast and accurate, with reasonable cost.
+
+How:
+- Test gemini cache first
+- Build a streamlit UI for it
+
+Test:
+- Create data set: Get 10 random parts in the doc, use models to create questions based on it.
+- Test the data set on the gemini cache
+- Later tested it on the RAG model
