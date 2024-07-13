@@ -141,7 +141,7 @@ model = genai.GenerativeModel(
 # Load FAR document
 @st.cache_resource
 def load_far_document():
-    with open('/Users/huyknguyen/Desktop/redhorse/code_projects/far_chat/docs/FAR_28-39.rtf', 'r') as file:
+    with open('./docs/FAR_28-39.rtf', 'r') as file:
         return file.read()
 
 far_text = load_far_document()
