@@ -184,10 +184,9 @@ with st.sidebar:
     st.header("Feedback")
     st.markdown("""
     Provide feedback on how you'd like the assistant to behave. Examples:
-    - "Please provide more concise answers"
-    - "I'd like more comprehensive explanations"
+    - "Please provide more concise/comprehensive answers"
+    - "Quoted exactly the FAR text"
     - "Use simpler language for easier understanding"
-    - "Include more specific FAR citations"
     """)
     
     # Use a form to group the input and button
