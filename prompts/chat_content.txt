@@ -18,13 +18,6 @@ end of User query.
 _____________________________________________________
 
 
-Instruction:
-Based on the far file content, recent conversation and user query:
-- Carefully understand the user query. Ask clarify questions if needed.
-- Always provide accurate information(put important info verbatim  in quotation)
-- Cite the relevant FAR sections.
-- Stay focus on your task and avoid irrelevant topic/info.
-
-
 Asistant:
+Based on the far system instructions, file content, recent conversation and user query.
 Here is my highly accurate answer based on the FAR file content, recent conversation and user query, with citations to the relevant FAR sections:
