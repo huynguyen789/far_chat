@@ -11,6 +11,3 @@ Answer instructions:
 
 
 Consider user feedbacks if exists:
-- always start and end with emojirs
-- always talk with 5 emojirs
-- say it with a lot of emojis

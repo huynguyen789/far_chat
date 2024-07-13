@@ -18,23 +18,39 @@ def chat_with_far(query):
         query=query
     )
     
-    response = model.generate_content(full_context, stream=True)
-    
-    full_response = ""
-    for chunk in response:
-        content = chunk.text
-        full_response += content
-        yield content
-    
-    # Add the query and response to the conversation history
-    st.session_state.conversation_history.append({"role": "human", "content": query})
-    st.session_state.conversation_history.append({"role": "assistant", "content": full_response})
-    
-    # Limit the conversation history to the last 10 exchanges
-    if len(st.session_state.conversation_history) > 20:
-        st.session_state.conversation_history = st.session_state.conversation_history[-20:]
-    
-    return full_response
+    try:
+        response = model.generate_content(full_context, stream=True)
+        
+        full_response = ""
+        for chunk in response:
+            if chunk.candidates:
+                candidate = chunk.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    content = candidate.content.parts[0].text
+                    full_response += content
+                    yield content
+
+                # Check finish reason after each chunk
+                if candidate.finish_reason == "SAFETY":
+                    safety_message = "\n\nNote: The response was filtered due to safety concerns.\nSafety ratings:\n"
+                    for rating in candidate.safety_ratings:
+                        safety_message += f"- Category: {rating.category}, Probability: {rating.probability}\n"
+                    yield safety_message
+                    break  # Stop streaming if we hit a safety filter
+
+            # If no candidates or content, yield an empty string to maintain the stream
+            if not chunk.candidates or not candidate.content or not candidate.content.parts:
+                yield ""
+
+        # Add the query and response to the conversation history
+        st.session_state.conversation_history.append({"role": "human", "content": query})
+        st.session_state.conversation_history.append({"role": "assistant", "content": full_response})
+        
+
+    except Exception as e:
+        error_message = f"An error occurred: {e}"
+        st.error(error_message)
+        yield "I apologize, but I encountered an error while processing your request. Please try again or rephrase your question."
 
 def summarize_conversation():
     conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
