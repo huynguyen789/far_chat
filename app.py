@@ -12,10 +12,12 @@ def load_prompt(filename):
 def chat_with_far(query):
     # Prepare the full context for the model
     conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
+    
     full_context = load_prompt("chat_content.txt").format(
         far_text=far_text,
         conversation_history=conversation_string,
-        query=query
+        query=query,
+        user_feedback=st.session_state.user_feedback
     )
     
     try:
@@ -59,6 +61,24 @@ def summarize_conversation():
     summary_response = model.generate_content(summary_prompt)
     return summary_response.text
 
+# Handle user feedback
+def set_user_feedback(feedback):
+    st.session_state.user_feedback = feedback  # Replace previous feedback with new feedback
+
+# Callback function to handle feedback submission
+def submit_feedback():
+    if st.session_state.feedback_input:
+        set_user_feedback(st.session_state.feedback_input)
+        st.session_state.feedback_input = ""  # Clear the input
+        st.success("Thank you for your feedback! It has been incorporated into the current session.")
+    else:
+        st.warning("Please enter some feedback before submitting.")
+
+# New function to clear feedback
+def clear_feedback():
+    st.session_state.user_feedback = ""
+    st.success("Feedback has been cleared.")
+    
 # JavaScript code to scroll to the bottom
 scroll_script = """
 <script>
@@ -140,10 +160,14 @@ if 'summary' not in st.session_state:
     st.session_state.summary = ""
 if 'introduced' not in st.session_state:
     st.session_state.introduced = False
+if 'user_feedback' not in st.session_state:
+    st.session_state.user_feedback = ""  # Initialize as an empty string
+
+
 
 st.title("Federal Acquisition Regulation (FAR) Chat Assistant")
 
-# Add a sidebar for debugging and the clear button
+#Side bar
 with st.sidebar:
     # # Debugging information box
     # st.header("Debugging Information")
@@ -157,7 +181,6 @@ with st.sidebar:
         st.session_state.introduced = False
         st.rerun()
         
-    # User feedback box
     st.header("Feedback")
     st.markdown("""
     Provide feedback on how you'd like the assistant to behave. Examples:
@@ -167,41 +190,36 @@ with st.sidebar:
     - "Include more specific FAR citations"
     """)
     
-    user_feedback = st.text_area("Enter your feedback:", height=100)
+    # Use a form to group the input and button
+    with st.form(key='feedback_form'):
+        user_feedback_input = st.text_area("Enter your feedback:", key="feedback_input", height=100)
+        col1, col2 = st.columns(2)
+        with col1:
+            submit_button = st.form_submit_button("Submit Feedback", on_click=submit_feedback)
+        with col2:
+            clear_button = st.form_submit_button("Clear Feedback", on_click=clear_feedback)
     
-    if st.button("Submit Feedback"):
-        if user_feedback:
-            # Process the feedback
-            system_instruction_path = "/Users/huyknguyen/Desktop/redhorse/code_projects/far_chat/prompts/system_instruction.txt"
-            with open(system_instruction_path, "r") as file:
-                current_instructions = file.read()
-            
-            # Add or update the user feedback section
-            if "Consider user feedbacks if exists:" in current_instructions:
-                lines = current_instructions.split("\n")
-                feedback_index = lines.index("Consider user feedbacks if exists:")
-                lines.insert(feedback_index + 1, f"- {user_feedback}")
-                updated_instructions = "\n".join(lines)
-            else:
-                updated_instructions = f"{current_instructions}\n\nConsider user feedbacks if exists:\n- {user_feedback}"
-            
-            # Write the updated instructions back to the file
-            with open(system_instruction_path, "w") as file:
-                file.write(updated_instructions)
-            
-            st.success("Thank you for your feedback! It has been incorporated into the assistant's behavior.")
-            
-            # Clear the feedback input after submission
-            st.session_state.user_feedback = ""
-        else:
-            st.warning("Please enter some feedback before submitting.")
+    # Display the current feedback
+    st.subheader("Current Feedback:")
+    st.text_area(
+        label="Current feedback",
+        value=st.session_state.user_feedback,
+        height=100,
+        disabled=True,
+        key="current_feedback_display"
+    )
+
+
+
+
+
 
 # Initialize the feedback input in session state if it doesn't exist
-if 'user_feedback' not in st.session_state:
-    st.session_state.user_feedback = ""
+if 'user_feedback_input' not in st.session_state:
+    st.session_state.user_feedback_input = ""
 
 # Use session state to maintain the feedback input value
-user_feedback = st.session_state.user_feedback  
+user_feedback_input = st.session_state.user_feedback_input
     
 
 # Chat container
@@ -248,3 +266,4 @@ if prompt := st.chat_input("Ask a question about FAR:"):
     if len(st.session_state.conversation_history) % 20 == 0:
         st.session_state.summary = summarize_conversation()
         st.experimental_rerun()  # Rerun
+
