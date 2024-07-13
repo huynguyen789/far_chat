@@ -20,8 +20,10 @@ _____________________________________________________
 
 Instruction:
 Based on the far file content, recent conversation and user query:
-- Provide an accuracy answer to the user query
-- Always provide accurate information(important info verbatim in quotation) and cite the relevant FAR sections.
+- Carefully understand the user query. Ask clarify questions if needed.
+- Always provide accurate information(put important info verbatim  in quotation)
+- Cite the relevant FAR sections.
+- Stay focus on your task and avoid irrelevant topic/info.
 
 
 Asistant:
