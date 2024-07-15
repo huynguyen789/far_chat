@@ -9,6 +9,72 @@ def load_prompt(filename):
     with open(prompt_path, "r") as file:
         return file.read().strip()
 
+def summarize_conversation():
+    conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
+    summary_prompt = load_prompt("summary_prompt.txt").format(conversation=conversation_string)
+
+    summary_response = model.generate_content(summary_prompt)
+    return summary_response.text
+
+# Handle user feedback
+def set_user_feedback(feedback):
+    st.session_state.user_feedback = feedback  # Replace previous feedback with new feedback
+
+# Callback function to handle feedback submission
+def submit_feedback():
+    if st.session_state.feedback_input:
+        set_user_feedback(st.session_state.feedback_input)
+        st.session_state.feedback_input = ""  # Clear the input
+        st.success("Thank you for your feedback! It has been incorporated into the current session.")
+    else:
+        st.warning("Please enter some feedback before submitting.")
+
+# New function to clear feedback
+def clear_feedback():
+    st.session_state.user_feedback = ""
+    st.success("Feedback has been cleared.")
+
+#Calculate pricing
+def calculate_price(input_tokens, output_tokens):
+    input_price = 0.35 if input_tokens <= 128000 else 0.70
+    output_price = 1.05 if input_tokens <= 128000 else 2.10
+    
+    return (input_tokens / 1000000) * input_price + (output_tokens / 1000000) * output_price
+
+
+def display_pricing():
+    st.header("Chat Pricing")
+    
+    if 'query_prices' not in st.session_state:
+        st.session_state.query_prices = []
+    
+    total_price = sum(st.session_state.query_prices)
+    
+    st.subheader("Query Prices")
+    for index, price in enumerate(st.session_state.query_prices, start=1):
+        st.text(f"Query {index}: ${price:.6f}")
+    
+    st.markdown("---")
+    st.markdown(f"**Total: ${total_price:.6f}**")
+
+def update_pricing(prompt_tokens, candidates_tokens):
+    if 'query_prices' not in st.session_state:
+        st.session_state.query_prices = []
+    
+    current_price = calculate_price(prompt_tokens, candidates_tokens)
+    st.session_state.query_prices.append(current_price)
+    
+    return current_price
+# Function to update token counts
+def update_token_counts(prompt_tokens, candidates_tokens):
+    if 'token_counts' not in st.session_state:
+        st.session_state.token_counts = []
+    
+    st.session_state.token_counts.append({
+        'promptTokenCount': prompt_tokens,
+        'candidatesTokenCount': candidates_tokens
+    })
+    
 def chat_with_far(query):
     # Prepare the full context for the model
     conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
@@ -39,6 +105,15 @@ def chat_with_far(query):
                         safety_message += f"- Category: {rating.category}, Probability: {rating.probability}\n"
                     yield safety_message
                     break  # Stop streaming if we hit a safety filter
+                
+        # Calculate tokens and update pricing after the full response
+        if hasattr(response, 'usage_metadata'):
+            prompt_tokens = response.usage_metadata.prompt_token_count
+            candidates_tokens = response.usage_metadata.candidates_token_count
+            current_price = update_pricing(prompt_tokens, candidates_tokens)
+            
+            # Yield a special message to signal token counts and price
+            yield f"TOKEN_COUNTS:{prompt_tokens},{candidates_tokens},{current_price}"
 
             # If no candidates or content, yield an empty string to maintain the stream
             if not chunk.candidates or not candidate.content or not candidate.content.parts:
@@ -53,32 +128,7 @@ def chat_with_far(query):
         error_message = f"An error occurred: {e}"
         st.error(error_message)
         yield "I apologize, but I encountered an error while processing your request. Please try again or rephrase your question."
-
-def summarize_conversation():
-    conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
-    summary_prompt = load_prompt("summary_prompt.txt").format(conversation=conversation_string)
-
-    summary_response = model.generate_content(summary_prompt)
-    return summary_response.text
-
-# Handle user feedback
-def set_user_feedback(feedback):
-    st.session_state.user_feedback = feedback  # Replace previous feedback with new feedback
-
-# Callback function to handle feedback submission
-def submit_feedback():
-    if st.session_state.feedback_input:
-        set_user_feedback(st.session_state.feedback_input)
-        st.session_state.feedback_input = ""  # Clear the input
-        st.success("Thank you for your feedback! It has been incorporated into the current session.")
-    else:
-        st.warning("Please enter some feedback before submitting.")
-
-# New function to clear feedback
-def clear_feedback():
-    st.session_state.user_feedback = ""
-    st.success("Feedback has been cleared.")
-    
+ 
 # JavaScript code to scroll to the bottom
 scroll_script = """
 <script>
@@ -141,7 +191,7 @@ model = genai.GenerativeModel(
 # Load FAR document
 @st.cache_resource
 def load_far_document():
-    with open('./docs/FAR_28-39.rtf', 'r') as file:
+    with open('./docs/far1000.rtf', 'r') as file:
         return file.read()
 
 far_text = load_far_document()
@@ -162,9 +212,11 @@ if 'introduced' not in st.session_state:
     st.session_state.introduced = False
 if 'user_feedback' not in st.session_state:
     st.session_state.user_feedback = ""  # Initialize as an empty string
-
-
-
+if 'token_counts' not in st.session_state:
+    st.session_state.token_counts = []
+if 'query_prices' not in st.session_state:
+    st.session_state.query_prices = []
+    
 st.title("Federal Acquisition Regulation (FAR) Chat Assistant")
 
 #Side bar
@@ -180,7 +232,8 @@ with st.sidebar:
         st.session_state.summary = ""
         st.session_state.introduced = False
         st.rerun()
-        
+    
+    # Feedback section 
     st.header("Feedback")
     st.markdown("""
     Provide feedback on how you'd like the assistant to behave. Examples:
@@ -207,6 +260,11 @@ with st.sidebar:
         disabled=True,
         key="current_feedback_display"
     )
+    
+    
+    # # Display pricing information
+    # st.markdown("---")
+    # display_pricing()
 
 
 
@@ -240,26 +298,26 @@ if not st.session_state.introduced:
             st.session_state.conversation_history.append({"role": "assistant", "content": intro_message})
     st.session_state.introduced = True
 
-# User input
-if prompt := st.chat_input("Ask a question about FAR:"):
-    # Display user message in chat message container
-    with chat_container:
-        with st.chat_message("human"):
-            st.markdown(prompt)
 
-    # Generate and display assistant response
-    with chat_container:
-        with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            full_response = ""
-            for chunk in chat_with_far(prompt):
+
+if prompt := st.chat_input("Ask a question about FAR:"):
+    with st.chat_message("human"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+        for chunk in chat_with_far(prompt):
+            if chunk.startswith("TOKEN_COUNTS:"):
+                # Extract token counts and price, then update the sidebar
+                prompt_tokens, candidate_tokens, current_price = map(float, chunk.split(":")[1].split(","))
+                with st.sidebar:
+                    st.empty()  # Clear the previous content
+                    display_pricing()  # Display updated pricing
+            else:
                 full_response += chunk
                 message_placeholder.markdown(full_response)
 
-            # Scroll down after each response chunk
-            st.markdown(scroll_script, unsafe_allow_html=True)
-    # Check if we need to summarize (every 20 messages)
-    if len(st.session_state.conversation_history) % 20 == 0:
-        st.session_state.summary = summarize_conversation()
-        st.experimental_rerun()  # Rerun
+        # Scroll down after each response chunk
+        st.markdown(scroll_script, unsafe_allow_html=True)
 
