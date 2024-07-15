@@ -2,6 +2,7 @@ import os
 import streamlit as st
 import google.generativeai as genai
 from streamlit.components.v1 import html
+import time
 
 #Functions
 def load_prompt(filename):
@@ -43,28 +44,33 @@ def calculate_price(input_tokens, output_tokens):
 
 
 def display_pricing():
-    st.header("Chat Pricing")
+    st.header("Chat Pricing and Performance")
     
-    if 'query_prices' not in st.session_state:
-        st.session_state.query_prices = []
+    if 'query_info' not in st.session_state:
+        st.session_state.query_info = []
     
-    total_price = sum(st.session_state.query_prices)
+    total_price = sum(info['price'] for info in st.session_state.query_info)
     
-    st.subheader("Query Prices")
-    for index, price in enumerate(st.session_state.query_prices, start=1):
-        st.text(f"Query {index}: ${price:.6f}")
+    st.subheader("Query Information")
+    for index, info in enumerate(st.session_state.query_info, start=1):
+        st.text(f"Query {index}: ${info['price']:.6f}.\nTime: {info['time']:.2f}s")
     
     st.markdown("---")
     st.markdown(f"**Total: ${total_price:.6f}**")
 
 def update_pricing(prompt_tokens, candidates_tokens):
-    if 'query_prices' not in st.session_state:
-        st.session_state.query_prices = []
+    if 'query_info' not in st.session_state:
+        st.session_state.query_info = []
     
     current_price = calculate_price(prompt_tokens, candidates_tokens)
-    st.session_state.query_prices.append(current_price)
+    query_time = time.time() - st.session_state.query_start_time
+    st.session_state.query_info.append({
+        'price': current_price,
+        'time': query_time
+    })
     
     return current_price
+
 # Function to update token counts
 def update_token_counts(prompt_tokens, candidates_tokens):
     if 'token_counts' not in st.session_state:
@@ -87,6 +93,7 @@ def chat_with_far(query):
     )
     
     try:
+        st.session_state.query_start_time = time.time()
         response = model.generate_content(full_context, stream=True)
         
         full_response = ""
@@ -106,14 +113,17 @@ def chat_with_far(query):
                     yield safety_message
                     break  # Stop streaming if we hit a safety filter
                 
-        # Calculate tokens and update pricing after the full response
+        # After processing all chunks, yield the query info
         if hasattr(response, 'usage_metadata'):
             prompt_tokens = response.usage_metadata.prompt_token_count
             candidates_tokens = response.usage_metadata.candidates_token_count
             current_price = update_pricing(prompt_tokens, candidates_tokens)
+            query_time = time.time() - st.session_state.query_start_time
             
-            # Yield a special message to signal token counts and price
-            yield f"TOKEN_COUNTS:{prompt_tokens},{candidates_tokens},{current_price}"
+            # Yield a special message to signal query info
+            yield f"QUERY_INFO:{prompt_tokens},{candidates_tokens},{current_price},{query_time}"
+
+
 
             # If no candidates or content, yield an empty string to maintain the stream
             if not chunk.candidates or not candidate.content or not candidate.content.parts:
@@ -301,17 +311,20 @@ if prompt := st.chat_input("Ask a question about FAR:"):
         message_placeholder = st.empty()
         full_response = ""
         for chunk in chat_with_far(prompt):
-            if chunk.startswith("TOKEN_COUNTS:"):
-                # Extract token counts and price, then update the sidebar
-                prompt_tokens, candidate_tokens, current_price = map(float, chunk.split(":")[1].split(","))
-
+            if chunk.startswith("QUERY_INFO:"):
+                # Extract query info and update session state
+                prompt_tokens, candidate_tokens, current_price, query_time = map(float, chunk.split(":")[1].split(","))
+                st.session_state.query_info.append({
+                    'price': current_price,
+                    'time': query_time
+                })
             else:
                 full_response += chunk
                 message_placeholder.markdown(full_response)
         
         with st.sidebar:
             st.empty()  # Clear the previous content
-            display_pricing()  # Display updated pricing
+            display_pricing()  # Display updated pricing and query info
         # Scroll down after each response chunk
         st.markdown(scroll_script, unsafe_allow_html=True)
 
