@@ -64,10 +64,13 @@ def update_pricing(prompt_tokens, candidates_tokens):
     
     current_price = calculate_price(prompt_tokens, candidates_tokens)
     query_time = time.time() - st.session_state.query_start_time
-    st.session_state.query_info.append({
-        'price': current_price,
-        'time': query_time
-    })
+    
+    # Check if this entry already exists
+    if not st.session_state.query_info or st.session_state.query_info[-1]['price'] != current_price:
+        st.session_state.query_info.append({
+            'price': current_price,
+            'time': query_time
+        })
     
     return current_price
 
@@ -113,21 +116,18 @@ def chat_with_far(query):
                     yield safety_message
                     break  # Stop streaming if we hit a safety filter
                 
+            # If no candidates or content, yield an empty string to maintain the stream
+            if not chunk.candidates or not candidate.content or not candidate.content.parts:
+                yield ""    
+                
         # After processing all chunks, yield the query info
         if hasattr(response, 'usage_metadata'):
             prompt_tokens = response.usage_metadata.prompt_token_count
             candidates_tokens = response.usage_metadata.candidates_token_count
-            current_price = update_pricing(prompt_tokens, candidates_tokens)
             query_time = time.time() - st.session_state.query_start_time
             
             # Yield a special message to signal query info
-            yield f"QUERY_INFO:{prompt_tokens},{candidates_tokens},{current_price},{query_time}"
-
-
-
-            # If no candidates or content, yield an empty string to maintain the stream
-            if not chunk.candidates or not candidate.content or not candidate.content.parts:
-                yield ""
+            yield f"QUERY_INFO:{prompt_tokens},{candidates_tokens},{query_time}"
 
         # Add the query and response to the conversation history
         st.session_state.conversation_history.append({"role": "human", "content": query})
@@ -229,6 +229,8 @@ if 'query_prices' not in st.session_state:
     st.session_state.query_prices = []
 if 'user_feedback_input' not in st.session_state:
     st.session_state.user_feedback_input = ""
+if 'query_info_updated' not in st.session_state:
+    st.session_state.query_info_updated = False
 
 st.title("Federal Acquisition Regulation (FAR) Chat Assistant")
 
@@ -302,8 +304,8 @@ if not st.session_state.introduced:
             st.session_state.conversation_history.append({"role": "assistant", "content": intro_message})
     st.session_state.introduced = True
 
-
 if prompt := st.chat_input("Ask a question about FAR:"):
+    st.session_state.query_info_updated = False
     with st.chat_message("human"):
         st.markdown(prompt)
 
@@ -311,13 +313,15 @@ if prompt := st.chat_input("Ask a question about FAR:"):
         message_placeholder = st.empty()
         full_response = ""
         for chunk in chat_with_far(prompt):
-            if chunk.startswith("QUERY_INFO:"):
+            if chunk.startswith("QUERY_INFO:") and not st.session_state.query_info_updated:
                 # Extract query info and update session state
-                prompt_tokens, candidate_tokens, current_price, query_time = map(float, chunk.split(":")[1].split(","))
+                prompt_tokens, candidate_tokens, query_time = map(float, chunk.split(":")[1].split(","))
+                current_price = calculate_price(prompt_tokens, candidate_tokens)
                 st.session_state.query_info.append({
                     'price': current_price,
                     'time': query_time
                 })
+                st.session_state.query_info_updated = True
             else:
                 full_response += chunk
                 message_placeholder.markdown(full_response)
