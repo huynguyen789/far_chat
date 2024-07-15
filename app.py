@@ -191,7 +191,7 @@ model = genai.GenerativeModel(
 # Load FAR document
 @st.cache_resource
 def load_far_document():
-    with open('./docs/far1000.rtf', 'r') as file:
+    with open('./docs/far29-38.rtf', 'r') as file:
         return file.read()
 
 far_text = load_far_document()
@@ -203,6 +203,7 @@ far_text = load_far_document()
 
 
 # Streamlit UI
+
 # Initialize session state
 if 'conversation_history' not in st.session_state:
     st.session_state.conversation_history = []
@@ -216,7 +217,9 @@ if 'token_counts' not in st.session_state:
     st.session_state.token_counts = []
 if 'query_prices' not in st.session_state:
     st.session_state.query_prices = []
-    
+if 'user_feedback_input' not in st.session_state:
+    st.session_state.user_feedback_input = ""
+
 st.title("Federal Acquisition Regulation (FAR) Chat Assistant")
 
 #Side bar
@@ -262,19 +265,10 @@ with st.sidebar:
     )
     
     
-    # # Display pricing information
-    # st.markdown("---")
-    # display_pricing()
-
-
-
-# Initialize the feedback input in session state if it doesn't exist
-if 'user_feedback_input' not in st.session_state:
-    st.session_state.user_feedback_input = ""
-
+    
+# Main chat interface
 # Use session state to maintain the feedback input value
 user_feedback_input = st.session_state.user_feedback_input
-    
 
 # Chat container
 chat_container = st.container()
@@ -299,7 +293,6 @@ if not st.session_state.introduced:
     st.session_state.introduced = True
 
 
-
 if prompt := st.chat_input("Ask a question about FAR:"):
     with st.chat_message("human"):
         st.markdown(prompt)
@@ -311,13 +304,14 @@ if prompt := st.chat_input("Ask a question about FAR:"):
             if chunk.startswith("TOKEN_COUNTS:"):
                 # Extract token counts and price, then update the sidebar
                 prompt_tokens, candidate_tokens, current_price = map(float, chunk.split(":")[1].split(","))
-                with st.sidebar:
-                    st.empty()  # Clear the previous content
-                    display_pricing()  # Display updated pricing
+
             else:
                 full_response += chunk
                 message_placeholder.markdown(full_response)
-
+        
+        with st.sidebar:
+            st.empty()  # Clear the previous content
+            display_pricing()  # Display updated pricing
         # Scroll down after each response chunk
         st.markdown(scroll_script, unsafe_allow_html=True)
 
