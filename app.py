@@ -72,6 +72,13 @@ def update_pricing(prompt_tokens, candidates_tokens):
             'time': query_time
         })
     
+    # Check if this entry already exists
+    if not st.session_state.query_info or st.session_state.query_info[-1]['price'] != current_price:
+        st.session_state.query_info.append({
+            'price': current_price,
+            'time': query_time
+        })
+    
     return current_price
 
 # Function to update token counts
@@ -115,6 +122,10 @@ def chat_with_far(query):
                         safety_message += f"- Category: {rating.category}, Probability: {rating.probability}\n"
                     yield safety_message
                     break  # Stop streaming if we hit a safety filter
+                
+            # If no candidates or content, yield an empty string to maintain the stream
+            if not chunk.candidates or not candidate.content or not candidate.content.parts:
+                yield ""    
                 
             # If no candidates or content, yield an empty string to maintain the stream
             if not chunk.candidates or not candidate.content or not candidate.content.parts:
@@ -323,6 +334,7 @@ if prompt := st.chat_input("Ask a question about FAR:"):
                     'price': current_price,
                     'time': query_time
                 })
+                st.session_state.query_info_updated = True
                 st.session_state.query_info_updated = True
             else:
                 full_response += chunk
