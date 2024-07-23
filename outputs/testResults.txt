@@ -1,0 +1,201 @@
+#Test result 1:
+You will need to flow down the following clauses to your subcontractors:
+
+52.203-3
+52.203-5
+52.203-6
+52.203-7
+52.203-8
+52.203-10
+52.203-12
+52.203-13
+52.203-14
+52.203-16
+52.203-17
+52.203-19
+52.204-4
+52.204-9
+52.204-10
+52.204-13
+52.204-15
+52.204-18
+52.204-19
+52.204-23
+52.204-25
+52.204-27
+52.209-6
+52.209-9
+52.209-10
+52.210-1
+52.215-2
+52.215-8
+52.215-16
+52.215-21
+52.215-23
+52.216-7
+52.216-8
+52.216-18
+52.216-19
+52.216-22
+52.219-3
+52.219-4
+52.219-6
+52.219-8
+52.219-9
+52.219-13
+52.219-14
+52.219-16
+52.219-27
+52.219-28
+52.219-29
+52.219-30
+52.219-31
+52.219-32
+52.222-2
+52.222-3
+52.222-21
+52.222-26
+52.222-35
+52.222-36
+52.222-37
+52.222-40
+52.222-41
+52.222-42
+52.222-43
+52.222-49
+52.222-50
+52.222-54
+52.222-62
+52.223-6
+52.223-18
+52.224-1
+52.224-2
+52.224-3
+52.225-13
+52.227-3
+52.227-11
+52.227-14
+52.227-16
+52.227-17
+52.227-18
+52.227-19
+52.228-5
+52.228-7
+52.229-3
+52.230-2
+52.230-6
+52.232-1
+52.232-7
+52.232-8
+52.232-9
+52.232-11
+52.232-17
+52.232-22
+52.232-23
+52.232-25
+52.232-33
+52.232-39
+52.232-40
+52.233-1
+52.233-3
+52.233-4
+52.237-3
+52.239-1
+52.242-1
+52.242-3
+52.242-4
+52.242-5
+52.242-13
+52.243-1
+52.243-2
+52.243-3
+52.244-2
+52.244-5
+52.244-6
+52.245-1
+52.245-9
+52.246-25
+52.249-2
+52.249-6
+52.249-8
+52.251-1
+52.253-1
+952.202-1
+952.204-75
+952.204-77
+952.208-70
+952.209-72
+952.215-70
+952.216-7
+952.242-70
+952.251-70
+952.247-70
+
+
+# Test result 2:
+<legal_opinion> This case involves a prime contractor reviewing a contract and determining which clauses to flow down to a subcontractor. The main legal issue is identifying the specific clauses that must be flowed down to subcontractors based on the FAR.
+
+Analysis:
+
+The FAR Subpart 44.4, Subcontracts for Commercial Products and Commercial Services, outlines the specific clauses that must be flowed down to subcontractors for commercial products and services.
+
+The contract in question is for supplies and services, and it is not explicitly stated that the products or services are commercial. However, the contract does include a clause for "Professional Employee Compensation Plan" (PECP), which suggests that the contract may involve services that are not commercial.
+
+Therefore, the prime contractor should consider flowing down the following clauses to the subcontractor, based on the FAR Subpart 44.4 and the contract's PECP clause:
+
+52.203-13, Contractor Code of Business Ethics and Conduct (NOV 2021)
+52.203-15, Whistleblower Protections Under the American Recovery and Reinvestment Act of 2009 (JUN 2010)
+52.203-17, Contractor Employee Whistleblower Rights (NOV 2023)
+52.204-21, Basic Safeguarding of Covered Contractor Information Systems (NOV 2021)
+52.204-23, Prohibition on Contracting for Hardware, Software, and Services Developed or Provided by Kaspersky Lab Covered Entities (DEC 2023)
+52.204-25, Prohibition on Contracting for Certain Telecommunications and Video Surveillance Services or Equipment (NOV 2021)
+52.204-27, Prohibition on a ByteDance Covered Application (JUN 2023)
+52.209-6, Protecting the Government's Interest When Subcontracting with Contractors Debarred, Suspended, or Proposed for Debarment (NOV 2021)
+52.209-9, Updates of Publicly Available Information Regarding Responsibility Matters (OCT 2018)
+52.209-10, Prohibition on Contracting with Inverted Domestic Corporations (NOV 2015)
+52.219-8, Utilization of Small Business Concerns (FEB 2024)
+52.219-9, Small Business Subcontracting Plan (SEP 2023)
+52.219-16, Liquidated Damages-Subcontracting Plan (SEP 2021)
+52.222-3, Convict Labor (JUN 2003)
+52.222-19, Child Labor-Cooperation with Authorities and Remedies (FEB 2024)
+52.222-21, Prohibition of Segregated Facilities (APR 2015)
+52.222-26, Equal Opportunity (SEP 2016)
+52.222-35, Equal Opportunity for Veterans (JUN 2020)
+52.222-36, Equal Opportunity for Workers with Disabilities (JUN 2020)
+52.222-37, Employment Reports on Veterans (JUN 2020)
+52.222-40, Notification of Employee Rights Under the National Labor Relations Act (DEC 2010)
+52.222-41, Service Contract Labor Standards (AUG 2018)
+52.222-42, Statement of Equivalent Rates for Federal Hires (MAY 2014)
+52.222-43, Fair Labor Standards Act and Service Contract Labor Standards-Price Adjustment (Multiple Year and Option Contracts) (AUG 2018)
+52.222-44, Fair Labor Standards Act and Service Contract Labor Standards-Price Adjustment (MAY 2014)
+52.222-49, Service Contract Labor Standards-Place of Performance Unknown (MAY 2014)
+52.222-50, Combating Trafficking in Persons (NOV 2021)
+52.222-54, Employment Eligibility Verification (MAY 2022)
+52.222-55, Minimum Wages for Contractor Workers Under Executive Order 14026 (JAN 2022)
+52.222-62, Paid Sick Leave Under Executive Order 13706 (JAN 2022)
+52.223-19, Compliance with Environmental Management Systems (MAY 2011)
+52.224-3, Privacy Training (JAN 2017)
+52.225-26, Contractors Performing Private Security Functions Outside the United States (OCT 2016)
+52.226-6, Promoting Excess Food Donation to Nonprofit Organizations (JUN 2020)
+52.232-40, Providing Accelerated Payments to Small Business Subcontractors (MAR 2023)
+52.242-5, Payments to Small Business Subcontractors (JAN 2017)
+52.242-13, Bankruptcy (JUL 1995)
+52.243-7, Notification of Changes (JAN 2017)
+52.244-2, Subcontracts (JUN 2020)
+52.245-1, Government Property (SEP 2021)
+52.245-9, Use and Charges (APR 2012)
+52.246-26, Reporting Nonconforming Items (NOV 2021)
+52.247-64, Preference for Privately Owned U.S.-Flag Commercial Vessels (NOV 2021)
+52.249-2, Termination for Convenience of the Government (Fixed-Price) (APR 2012)
+52.249-6, Termination (Cost-Reimbursement) (MAY 2004)
+52.249-8, Default (Fixed-Price Supply and Service) (APR 1984)
+52.251-1, Government Supply Sources (APR 2012)
+52.253-1, Computer Generated Forms (JAN 1991)
+Recommendations:
+
+The prime contractor should carefully review the contract and the FAR Subpart 44.4 to ensure that all required clauses are flowed down to the subcontractor. If the contract involves services that are not commercial, the prime contractor should consult with legal counsel to determine the specific clauses that must be flowed down.
+
+Caveats:
+
+This analysis is based on the information provided in the contract and the FAR document. Additional information may be needed to provide more specific advice.
+The prime contractor should always consult with legal counsel to ensure compliance with all applicable laws and regulations. </legal_opinion>

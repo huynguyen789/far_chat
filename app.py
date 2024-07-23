@@ -212,7 +212,7 @@ model = genai.GenerativeModel(
 # Load FAR document
 @st.cache_resource
 def load_far_document():
-    with open('./docs/far10.rtf', 'r') as file:
+    with open('./docs/farfull.rtf', 'r') as file:
         return file.read()
 
 far_text = load_far_document()
@@ -228,7 +228,7 @@ far_text = load_far_document()
 # Initialize session state
 if 'conversation_history' not in st.session_state:
     st.session_state.conversation_history = [
-        {"role": "system", "content": f"FAR Text: {far_text}.\nend FAR Text.\n\n"}
+        {"role": "system", "content": f"<legal_context>FAR Text: {far_text}.\n</legal_context>.\n\n"}
     ]
 if 'summary' not in st.session_state:
     st.session_state.summary = ""
