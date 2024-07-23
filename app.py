@@ -96,7 +96,7 @@ def chat_with_far(query):
     conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
     
     full_context = load_prompt("chat_content.txt").format(
-        far_text=far_text,
+        # far_text=far_text,
         conversation_history=conversation_string,
         query=query,
         user_feedback=st.session_state.user_feedback
@@ -212,7 +212,7 @@ model = genai.GenerativeModel(
 # Load FAR document
 @st.cache_resource
 def load_far_document():
-    with open('./docs/farFull.rtf', 'r') as file:
+    with open('./docs/far10.rtf', 'r') as file:
         return file.read()
 
 far_text = load_far_document()
@@ -227,7 +227,9 @@ far_text = load_far_document()
 
 # Initialize session state
 if 'conversation_history' not in st.session_state:
-    st.session_state.conversation_history = []
+    st.session_state.conversation_history = [
+        {"role": "system", "content": f"FAR Text: {far_text}.\nend FAR Text.\n\n"}
+    ]
 if 'summary' not in st.session_state:
     st.session_state.summary = ""
 if 'introduced' not in st.session_state:
@@ -256,7 +258,9 @@ with st.sidebar:
     
     # Move the clear button to the sidebar
     if st.button("Clear Conversation"):
-        st.session_state.conversation_history = []
+        st.session_state.conversation_history = [
+            {"role": "system", "content": f"FAR Text: {far_text}"}
+        ]
         st.session_state.summary = ""
         st.session_state.introduced = False
         st.rerun()
@@ -304,7 +308,7 @@ with chat_container:
         with st.expander("Conversation Summary", expanded=False):
             st.markdown(st.session_state.summary)
     
-    for message in st.session_state.conversation_history:
+    for message in st.session_state.conversation_history[1:]:  # Skip the first message containing FAR text
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
