@@ -212,7 +212,7 @@ model = genai.GenerativeModel(
 # Load FAR document
 @st.cache_resource
 def load_far_document():
-    with open('./docs/farfull.rtf', 'r') as file:
+    with open('./docs/farFull.rtf', 'r') as file:
         return file.read()
 
 far_text = load_far_document()
