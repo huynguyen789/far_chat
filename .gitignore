@@ -16,8 +16,13 @@ __pycache__/
 dist/
 build/
 *.log
-*.pdf
 *.docx
 Sol_89303023REI000090_Amd_0004.txt
 
-data/
+# Ignore all PDFs in the repository
+**/*.pdf
+
+# But don't ignore the data folder itself
+!data/
+# # However, still ignore PDFs within the data folder
+# data/**/*.pdf
