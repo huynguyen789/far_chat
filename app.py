@@ -1,352 +1,263 @@
-import os
 import streamlit as st
-import google.generativeai as genai
-from streamlit.components.v1 import html
-import time
+import os
+import glob
+from dotenv import load_dotenv
+from unstructured_client import UnstructuredClient
+from unstructured_client.models import shared
+from unstructured.staging.base import dict_to_elements
+from unstructured.chunking.title import chunk_by_title
+from langchain.schema import Document
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+import json
+from typing import List, Tuple
+import re
+from rank_bm25 import BM25Okapi
 
-#Functions
-def load_prompt(filename):
-    prompt_path = os.path.join(os.path.dirname(__file__), "prompts", filename)
-    with open(prompt_path, "r") as file:
-        return file.read().strip()
+# Load environment variables
+load_dotenv()
 
-def summarize_conversation():
-    conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
-    summary_prompt = load_prompt("summary_prompt.txt").format(conversation=conversation_string)
+# Get unstructured API key
+unstructured_api_key = os.getenv("UNSTRUCTURED_API_KEY")
+if not unstructured_api_key:
+    raise ValueError("UNSTRUCTURED_API_KEY environment variable not found")
 
-    summary_response = model.generate_content(summary_prompt)
-    return summary_response.text
+class EnhancedRetriever:
+    def __init__(self, vectorstore, documents):
+        self.vectorstore = vectorstore
+        self.documents = documents
+        self.bm25 = self._create_bm25_index()
 
-# Handle user feedback
-def set_user_feedback(feedback):
-    st.session_state.user_feedback = feedback  # Replace previous feedback with new feedback
+    def _create_bm25_index(self):
+        tokenized_docs = [self._tokenize(doc.page_content) for doc in self.documents]
+        return BM25Okapi(tokenized_docs)
 
-# Callback function to handle feedback submission
-def submit_feedback():
-    if st.session_state.feedback_input:
-        set_user_feedback(st.session_state.feedback_input)
-        st.session_state.feedback_input = ""  # Clear the input
-        st.success("Thank you for your feedback! It has been incorporated into the current session.")
-    else:
-        st.warning("Please enter some feedback before submitting.")
+    def _tokenize(self, text: str) -> List[str]:
+        tokens = re.findall(r'\b\d+(?:\.\d+)*(?:\s+[A-Za-z]+(?:\s+[A-Za-z]+)*)?\b|\w+', text.lower())
+        return tokens
 
-# New function to clear feedback
-def clear_feedback():
-    st.session_state.user_feedback = ""
-    st.success("Feedback has been cleared.")
-
-#Calculate pricing
-def calculate_price(input_tokens, output_tokens):
-    input_price = 0.35 if input_tokens <= 128000 else 0.70
-    output_price = 1.05 if input_tokens <= 128000 else 2.10
-    
-    return (input_tokens / 1000000) * input_price + (output_tokens / 1000000) * output_price
-
-
-def display_pricing():
-    st.header("Chat Pricing and Performance")
-    
-    if 'query_info' not in st.session_state:
-        st.session_state.query_info = []
-    
-    total_price = sum(info['price'] for info in st.session_state.query_info)
-    
-    st.subheader("Query Information")
-    for index, info in enumerate(st.session_state.query_info, start=1):
-        st.text(f"Query {index}: ${info['price']:.6f}.\nTime: {info['time']:.2f}s")
-    
-    st.markdown("---")
-    st.markdown(f"**Total: ${total_price:.6f}**")
-
-def update_pricing(prompt_tokens, candidates_tokens):
-    if 'query_info' not in st.session_state:
-        st.session_state.query_info = []
-    
-    current_price = calculate_price(prompt_tokens, candidates_tokens)
-    query_time = time.time() - st.session_state.query_start_time
-    
-    # Check if this entry already exists
-    if not st.session_state.query_info or st.session_state.query_info[-1]['price'] != current_price:
-        st.session_state.query_info.append({
-            'price': current_price,
-            'time': query_time
-        })
-    
-    # Check if this entry already exists
-    if not st.session_state.query_info or st.session_state.query_info[-1]['price'] != current_price:
-        st.session_state.query_info.append({
-            'price': current_price,
-            'time': query_time
-        })
-    
-    return current_price
-
-# Function to update token counts
-def update_token_counts(prompt_tokens, candidates_tokens):
-    if 'token_counts' not in st.session_state:
-        st.session_state.token_counts = []
-    
-    st.session_state.token_counts.append({
-        'promptTokenCount': prompt_tokens,
-        'candidatesTokenCount': candidates_tokens
-    })
-    
-def chat_with_far(query):
-    # Prepare the full context for the model
-    conversation_string = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.conversation_history])
-    
-    full_context = load_prompt("chat_content.txt").format(
-        # far_text=far_text,
-        conversation_history=conversation_string,
-        query=query,
-        user_feedback=st.session_state.user_feedback
-    )
-    
-    try:
-        st.session_state.query_start_time = time.time()
-        response = model.generate_content(full_context, stream=True)
+    def hybrid_search(self, query: str, k: int = 4) -> List[Tuple[float, Document]]:
+        vector_results = self.vectorstore.similarity_search_with_score(query, k=k)
+        keyword_results = self.keyword_search(query, k=k)
         
-        full_response = ""
-        for chunk in response:
-            if chunk.candidates:
-                candidate = chunk.candidates[0]
-                if candidate.content and candidate.content.parts:
-                    content = candidate.content.parts[0].text
-                    full_response += content
-                    yield content
-
-                # Check finish reason after each chunk
-                if candidate.finish_reason == "SAFETY":
-                    safety_message = "\n\nNote: The response was filtered due to safety concerns.\nSafety ratings:\n"
-                    for rating in candidate.safety_ratings:
-                        safety_message += f"- Category: {rating.category}, Probability: {rating.probability}\n"
-                    yield safety_message
-                    break  # Stop streaming if we hit a safety filter
-                
-            # If no candidates or content, yield an empty string to maintain the stream
-            if not chunk.candidates or not candidate.content or not candidate.content.parts:
-                yield ""    
-                
-            # If no candidates or content, yield an empty string to maintain the stream
-            if not chunk.candidates or not candidate.content or not candidate.content.parts:
-                yield ""    
-                
-        # After processing all chunks, yield the query info
-        if hasattr(response, 'usage_metadata'):
-            prompt_tokens = response.usage_metadata.prompt_token_count
-            candidates_tokens = response.usage_metadata.candidates_token_count
-            query_time = time.time() - st.session_state.query_start_time
-            
-            # Yield a special message to signal query info
-            yield f"QUERY_INFO:{prompt_tokens},{candidates_tokens},{query_time}"
-
-        # Add the query and response to the conversation history
-        st.session_state.conversation_history.append({"role": "human", "content": query})
-        st.session_state.conversation_history.append({"role": "assistant", "content": full_response})
+        combined_results = {}
+        query_keywords = set(query.lower().split())
         
-
-    except Exception as e:
-        error_message = f"An error occurred: {e}"
-        st.error(error_message)
-        yield "I apologize, but I encountered an error while processing your request. Please try again or rephrase your question."
- 
-# JavaScript code to scroll to the bottom
-scroll_script = """
-<script>
-    function scrollToBottom() {
-        var chatContainer = parent.document.querySelector('section.main');
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
-    scrollToBottom();
-</script>
-"""
-#End functions
-#############################################################################################################
-
-
-
-#Set up
-api_key = st.secrets["GOOGLE_API_KEY"]
-genai.configure(api_key=api_key)
-
-# Create the model
-generation_config = {
-    "temperature": 0,
-    # "top_p": 0.95,
-    # "top_k": 64,
-    "max_output_tokens": 8192,
-}
-
-system_instruction = load_prompt("system_instruction.txt")
-
-safety_settings = [
-    {
-        "category": "HARM_CATEGORY_DANGEROUS",
-        "threshold": "BLOCK_NONE",
-    },
-    {
-        "category": "HARM_CATEGORY_HARASSMENT",
-        "threshold": "BLOCK_NONE",
-    },
-    {
-        "category": "HARM_CATEGORY_HATE_SPEECH",
-        "threshold": "BLOCK_NONE",
-    },
-    {
-        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        "threshold": "BLOCK_NONE",
-    },
-    {
-        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-        "threshold": "BLOCK_NONE",
-    }
-]
-
-model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            generation_config=generation_config,
-            system_instruction=system_instruction,
-            safety_settings=safety_settings
-        )
-
-# Load FAR document
-@st.cache_resource
-def load_far_document():
-    with open('./docs/farFull.rtf', 'r') as file:
-        return file.read()
-
-far_text = load_far_document()
-#End set up
-#############################################################################################################
-
-
-
-
-
-# Streamlit UI
-
-# Initialize session state
-if 'conversation_history' not in st.session_state:
-    st.session_state.conversation_history = [
-        {"role": "system", "content": f"<legal_context>FAR Text: {far_text}.\n</legal_context>.\n\n"}
-    ]
-if 'summary' not in st.session_state:
-    st.session_state.summary = ""
-if 'introduced' not in st.session_state:
-    st.session_state.introduced = False
-if 'user_feedback' not in st.session_state:
-    st.session_state.user_feedback = ""  # Initialize as an empty string
-if 'token_counts' not in st.session_state:
-    st.session_state.token_counts = []
-if 'query_prices' not in st.session_state:
-    st.session_state.query_prices = []
-if 'user_feedback_input' not in st.session_state:
-    st.session_state.user_feedback_input = ""
-if 'query_info_updated' not in st.session_state:
-    st.session_state.query_info_updated = False
-if 'query_info' not in st.session_state:
-    st.session_state.query_info = []
-    
-st.title("Federal Acquisition Regulation (FAR) Chat Assistant")
-
-#Side bar
-with st.sidebar:
-    # # Debugging information box
-    # st.header("Debugging Information")
-    # st.subheader("Full Conversation History")
-    # st.json(st.session_state.conversation_history)
-    
-    # Move the clear button to the sidebar
-    if st.button("Clear Conversation"):
-        st.session_state.conversation_history = [
-            {"role": "system", "content": f"FAR Text: {far_text}"}
-        ]
-        st.session_state.summary = ""
-        st.session_state.introduced = False
-        st.rerun()
-    
-    # Feedback section 
-    st.header("Feedback")
-    st.markdown("""
-    Provide feedback on how you'd like the assistant to behave. Examples:
-    - "Please provide more concise/comprehensive answers"
-    - "Quoted exactly the FAR text"
-    - "Use simpler language for easier understanding"
-    """)
-    
-    # Use a form to group the input and button
-    with st.form(key='feedback_form'):
-        user_feedback_input = st.text_area("Enter your feedback:", key="feedback_input", height=100)
-        col1, col2 = st.columns(2)
-        with col1:
-            submit_button = st.form_submit_button("Submit Feedback", on_click=submit_feedback)
-        with col2:
-            clear_button = st.form_submit_button("Clear Feedback", on_click=clear_feedback)
-    
-    # Display the current feedback
-    st.subheader("Current Feedback:")
-    st.text_area(
-        label="Current feedback",
-        value=st.session_state.user_feedback,
-        height=100,
-        disabled=True,
-        key="current_feedback_display"
-    )
-    
-    
-    
-# Main chat interface
-# Use session state to maintain the feedback input value
-user_feedback_input = st.session_state.user_feedback_input
-
-# Chat container
-chat_container = st.container()
-
-# Display chat messages
-with chat_container:
-    if st.session_state.summary:
-        with st.expander("Conversation Summary", expanded=False):
-            st.markdown(st.session_state.summary)
-    
-    for message in st.session_state.conversation_history[1:]:  # Skip the first message containing FAR text
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-# Introduction message
-if not st.session_state.introduced:
-    with chat_container:
-        with st.chat_message("assistant"):
-            intro_message = "Hello! I'm your Federal Acquisition Regulation (FAR) Chat Assistant. I'm here to help you navigate and understand the Federal Acquisition Regulation. Feel free to ask me any questions about FAR, and I'll do my best to provide accurate and helpful information. How can I assist you today?"
-            st.markdown(intro_message)
-            st.session_state.conversation_history.append({"role": "assistant", "content": intro_message})
-    st.session_state.introduced = True
-
-if prompt := st.chat_input("Ask a question about FAR:"):
-    st.session_state.query_info_updated = False
-    with st.chat_message("human"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        full_response = ""
-        for chunk in chat_with_far(prompt):
-            if chunk.startswith("QUERY_INFO:") and not st.session_state.query_info_updated:
-                # Extract query info and update session state
-                prompt_tokens, candidate_tokens, query_time = map(float, chunk.split(":")[1].split(","))
-                current_price = calculate_price(prompt_tokens, candidate_tokens)
-                st.session_state.query_info.append({
-                    'price': current_price,
-                    'time': query_time
-                })
-                st.session_state.query_info_updated = True
-                st.session_state.query_info_updated = True
+        for doc, score in vector_results:
+            combined_results[doc.page_content] = {'doc': doc, 'vector_score': score, 'keyword_score': 0, 'exact_match': False}
+            doc_words = set(doc.page_content.lower().split())
+            if query_keywords.issubset(doc_words):
+                combined_results[doc.page_content]['exact_match'] = True
+        
+        for score, doc in keyword_results:
+            if doc.page_content in combined_results:
+                combined_results[doc.page_content]['keyword_score'] = score
             else:
-                full_response += chunk
-                message_placeholder.markdown(full_response)
+                combined_results[doc.page_content] = {'doc': doc, 'vector_score': 0, 'keyword_score': score, 'exact_match': False}
+            
+            doc_words = set(doc.page_content.lower().split())
+            if query_keywords.issubset(doc_words):
+                combined_results[doc.page_content]['exact_match'] = True
         
-        with st.sidebar:
-            st.empty()  # Clear the previous content
-            display_pricing()  # Display updated pricing and query info
-        # Scroll down after each response chunk
-        st.markdown(scroll_script, unsafe_allow_html=True)
+        final_results = []
+        for content, scores in combined_results.items():
+            normalized_vector_score = 1 / (1 + scores['vector_score'])
+            normalized_keyword_score = scores['keyword_score']
+            exact_match_bonus = 2 if scores['exact_match'] else 0
+            combined_score = (normalized_vector_score + normalized_keyword_score + exact_match_bonus) / 3
+            final_results.append((combined_score, scores['doc']))
+        
+        return sorted(final_results, key=lambda x: x[0], reverse=True)[:k]
+
+    def keyword_search(self, query: str, k: int = 4) -> List[Tuple[float, Document]]:
+        tokenized_query = self._tokenize(query)
+        bm25_scores = self.bm25.get_scores(tokenized_query)
+        scored_docs = [(score, self.documents[i]) for i, score in enumerate(bm25_scores)]
+        return sorted(scored_docs, key=lambda x: x[0], reverse=True)[:k]
+
+def process_pdfs_and_cache(input_folder, output_folder, strategy):
+    # Initialize the UnstructuredClient
+    s = UnstructuredClient(api_key_auth=unstructured_api_key, server_url='https://redhorse-d652ahtg.api.unstructuredapp.io')
+
+    os.makedirs(output_folder, exist_ok=True)
+    folder_name = os.path.basename(os.path.normpath(input_folder))
+    cache_file_path = os.path.join(output_folder, f'{folder_name}_combined_content.json')
+
+    if os.path.exists(cache_file_path):
+        with open(cache_file_path, 'r', encoding='utf-8') as f:
+            combined_content = json.load(f)
+    else:
+        combined_content = []
+        for filename in glob.glob(os.path.join(input_folder, "*.pdf")):
+            with open(filename, "rb") as file:
+                req = shared.PartitionParameters(
+                    files=shared.Files(
+                        content=file.read(),
+                        file_name=filename,
+                    ),
+                    strategy=strategy,
+                )
+                res = s.general.partition(req)
+                combined_content.extend(res.elements)
+
+        with open(cache_file_path, 'w', encoding='utf-8') as f:
+            json.dump(combined_content, f)
+
+    return combined_content
+
+def process_data(combined_content):
+    pdf_elements = dict_to_elements(combined_content)
+    elements = chunk_by_title(pdf_elements, combine_text_under_n_chars=4000, max_characters=8000, new_after_n_chars=7000, overlap=1000)
+    documents = []
+    for element in elements:
+        metadata = element.metadata.to_dict()
+        metadata.pop("languages", None)
+        metadata["source"] = metadata["filename"]
+        documents.append(Document(page_content=element.text, metadata=metadata))
+    return documents
+
+@st.cache_resource
+def initialize_retriever(folder_path):
+    strategy = "auto"
+    combined_content = process_pdfs_and_cache(folder_path, "./cache", strategy)
+    documents = process_data(combined_content)
+    embeddings = OpenAIEmbeddings()
+    vectorstore = FAISS.from_documents(documents, embeddings)
+    return EnhancedRetriever(vectorstore, documents)
+
+def organize_documents(docs):
+    organized_text = ""
+    for i, doc in enumerate(docs, start=1):
+        source = doc.metadata.get('source', 'unknown source')
+        page_number = doc.metadata.get('page_number', 'unknown page number')
+        organized_text += f"Document {i}:\nSource: {source}\nPage number: {page_number}\nContent: {doc.page_content}\n\n"
+    return organized_text
+
+def create_llm(model_name: str, streaming: bool = False):
+    return ChatOpenAI(model_name=model_name, temperature=0, streaming=streaming)
+
+def generate_answer(query: str, relevant_data: str, llm: ChatOpenAI):
+    prompt = PromptTemplate(
+        template="""
+        Based on the following relevant data, please answer the user's query.
+        Provide a comprehensive and accurate answer, using the information given.
+        If the information is not sufficient to answer the query fully, state so clearly.
+        The answer should have 3 parts:
+        1. An easy to understand answer/explanation with a concise, short example.
+        2. The exact wording and format from the original document, ensuring the full section is included (for citing purposes).
+        3. If the content refers to any other section or clause(s), state it out to the user.
+
+        Relevant data:
+        {relevant_data}
+        
+        User query: {query}
+        
+        Answer in a nice markdown format:
+        """,
+        input_variables=["query", "relevant_data"],
+    )
+    chain = prompt | llm | StrOutputParser()
+    return chain.invoke({"query": query, "relevant_data": relevant_data})
+
+def extract_search_keywords(query: str, llm: ChatOpenAI) -> str:
+    prompt = PromptTemplate(
+        template="""
+        Extract the most relevant search keywords or phrases from this query for searching through Federal Acquisition Regulation (FAR) documents.
+        Focus on specific terms, section numbers, or phrases that are likely to yield the most relevant results.
+        Return your answer as a comma-separated string of keywords.
+
+        User query: {query}
+        """,
+        input_variables=["query"],
+    )
+    chain = prompt | llm | StrOutputParser()
+    result = chain.invoke({"query": query})
+    return result.strip()
+
+def rag_query_enhanced(user_query: str, enhanced_retriever: EnhancedRetriever, model_name: str = "gpt-4", use_streaming: bool = False, k: int = 4):
+    keyword_llm = create_llm(model_name, streaming=False)
+    search_keywords = extract_search_keywords(user_query, keyword_llm)
+    retrieved_docs = enhanced_retriever.hybrid_search(search_keywords, k=k)
+    organized_text = organize_documents([doc for _, doc in retrieved_docs])
+    answer_llm = create_llm(model_name, use_streaming)
+    answer = generate_answer(user_query, organized_text, answer_llm)
+    return answer
+
+def get_data_folders():
+    data_dir = "./data"
+    return [f for f in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, f))]
+# Streamlit app
+def main():
+    st.title("FAR Query Assistant")
+    st.write("Ask questions about the Federal Acquisition Regulation (FAR)")
+
+    # Get available folders
+    folder_options = get_data_folders()
+    
+    if not folder_options:
+        st.error("No folders found in the ./data directory.")
+        return
+
+    # Folder selection with session state
+    if 'selected_folder' not in st.session_state:
+        st.session_state.selected_folder = None
+    selected_folder = st.selectbox("Select folder to chat with:", 
+                                   folder_options, 
+                                   key='folder_selector',
+                                   index=folder_options.index(st.session_state.selected_folder) if st.session_state.selected_folder in folder_options else 0)
+    
+    # Update session state
+    st.session_state.selected_folder = selected_folder
+
+    # Display file size information
+    folder_path = os.path.join("./data", selected_folder)
+    total_size = sum(os.path.getsize(os.path.join(folder_path, f)) for f in os.listdir(folder_path) if f.endswith('.pdf'))
+    total_size_mb = total_size / (1024 * 1024)  # Convert to MB
+
+    st.info(f"Selected folder contains {total_size_mb:.2f} MB of PDF files. "
+            f"Large files may take longer to initialize.")
+
+    # Initialize the retriever with the selected folder
+    with st.spinner("Initializing retriever... This may take a while for large files."):
+        retriever = initialize_retriever(folder_path)
+
+    # Query input
+    query = st.text_input("Enter your query:")
+
+    # Use session state to store query history
+    if 'query_history' not in st.session_state:
+        st.session_state.query_history = []
+
+    # Model selection
+    model_name = st.selectbox("Select model:", ["gpt-4o", "gpt-4o-mini"])
+
+    # Number of documents to retrieve
+    k = st.slider("Number of documents to retrieve:", min_value=1, max_value=10, value=4)
+
+    # Submit button
+    if st.button("Submit"):
+        if query:
+            with st.spinner("Processing query..."):
+                answer = rag_query_enhanced(query, retriever, model_name=model_name, k=k)
+                st.markdown("### Answer:")
+                st.markdown(answer)
+            
+            # Add query to history
+            st.session_state.query_history.append(query)
+
+    # Display query history
+    if st.session_state.query_history:
+        st.subheader("Query History")
+        for i, past_query in enumerate(reversed(st.session_state.query_history), 1):
+            st.text(f"{i}. {past_query}")
+
+    # Clear history button
+    if st.button("Clear History"):
+        st.session_state.query_history = []
+        st.experimental_rerun()
+
+if __name__ == "__main__":
+    main()
 
