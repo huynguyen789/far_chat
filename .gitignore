@@ -4,22 +4,21 @@
 .streamlit/
 # Ignore .env file
 .env
-# Additional common ignores for Python projects
-__pycache__/
-*.py[cod]
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
-*.log
+# # Additional common ignores for Python projects
+# __pycache__/
+# *.py[cod]
+# *.so
+# *.egg
+# *.egg-info/
+# dist/
+# build/
+# *.log
 *.docx
 Sol_89303023REI000090_Amd_0004.txt
 
-
-# Include data folder and all its contents
-!data/
-!data/**/*
+# Ignore everything in data folder except subdirectories
+# data/*
+!data/*/
 
 # Ignore PDFs everywhere, including in data folder
-**/*.pdf
+*.pdf
