@@ -17,7 +17,7 @@
 Sol_89303023REI000090_Amd_0004.txt
 
 # Ignore everything in data folder except subdirectories
-# data/*
+data/*
 !data/*/
 
 # Ignore PDFs everywhere, including in data folder

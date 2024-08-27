@@ -144,10 +144,12 @@ def generate_answer(query: str, relevant_data: str, llm: ChatOpenAI):
         Based on the following relevant data, please answer the user's query.
         Provide a comprehensive and accurate answer, using the information given.
         If the information is not sufficient to answer the query fully, state so clearly.
+        Sometime, the full section got cut off or break down to separated parts. Carefully look at the relevant data and connect them if they belong to each other. Pay attention to the sections number to figure it out.
+
         The answer should have 3 parts:
         1. An easy to understand answer/explanation with a concise, short example.
         2. The exact wording and format from the original document, ensuring the full section is included (for citing purposes).
-        3. If the content refers to any other section or clause(s), state it out to the user.
+        3. If the content refers to any other section or clause(s), state it out to the user. ex: "This section also references: ...."
 
         Relevant data:
         {relevant_data}
@@ -185,25 +187,26 @@ def rag_query_enhanced(user_query: str, enhanced_retriever: EnhancedRetriever, m
     answer = generate_answer(user_query, organized_text, answer_llm)
     return answer
 
-def get_data_folders():
-    data_dir = "./data"
-    return [f for f in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, f))]
+def get_cache_folders():
+    cache_dir = "./cache"
+    return [f for f in os.listdir(cache_dir) if f.endswith('_combined_content.json')]
+
 # Streamlit app
 def main():
     st.title("FAR Query Assistant")
     st.write("Ask questions about the Federal Acquisition Regulation (FAR)")
 
     # Get available folders
-    folder_options = get_data_folders()
+    folder_options = get_cache_folders()
     
     if not folder_options:
-        st.error("No folders found in the ./data directory.")
+        st.error("No cached files found in the ./cache directory.")
         return
 
     # Folder selection with session state
     if 'selected_folder' not in st.session_state:
         st.session_state.selected_folder = None
-    selected_folder = st.selectbox("Select folder to chat with:", 
+    selected_folder = st.selectbox("Select file to chat with:", 
                                    folder_options, 
                                    key='folder_selector',
                                    index=folder_options.index(st.session_state.selected_folder) if st.session_state.selected_folder in folder_options else 0)
@@ -212,19 +215,14 @@ def main():
     st.session_state.selected_folder = selected_folder
 
     # Display file size information
-    folder_path = os.path.join("./data", selected_folder)
-    total_size = sum(os.path.getsize(os.path.join(folder_path, f)) for f in os.listdir(folder_path) if f.endswith('.pdf'))
-    total_size_mb = total_size / (1024 * 1024)  # Convert to MB
+    cache_file_path = os.path.join("./cache", selected_folder)
 
-    st.info(f"Selected folder contains {total_size_mb:.2f} MB of PDF files. "
-            f"Large files may take longer to initialize.")
-
-    # Initialize the retriever with the selected folder
-    with st.spinner("Initializing retriever... This may take a while for large files."):
-        retriever = initialize_retriever(folder_path)
+    # Initialize the retriever with the selected cache file
+    with st.spinner("Initializing system... This may take a while for files large, ~10s for 1000 pages."):
+        retriever = initialize_retriever_from_cache(cache_file_path)
 
     # Query input
-    query = st.text_input("Enter your query:")
+    query = st.text_input("Enter your query:  (ex: Tell me about the 1.102-2 Performance standards)")
 
     # Use session state to store query history
     if 'query_history' not in st.session_state:
@@ -257,6 +255,15 @@ def main():
     if st.button("Clear History"):
         st.session_state.query_history = []
         st.experimental_rerun()
+
+@st.cache_resource
+def initialize_retriever_from_cache(cache_file_path):
+    with open(cache_file_path, 'r', encoding='utf-8') as f:
+        combined_content = json.load(f)
+    documents = process_data(combined_content)
+    embeddings = OpenAIEmbeddings()
+    vectorstore = FAISS.from_documents(documents, embeddings)
+    return EnhancedRetriever(vectorstore, documents)
 
 if __name__ == "__main__":
     main()
