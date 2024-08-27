@@ -15,8 +15,7 @@ build/
 *.log
 *.docx
 Sol_89303023REI000090_Amd_0004.txt
-# Ignore PDFs everywhere
-**/*.pdf
+
 
 # Include data folder and all its contents
 !data/
