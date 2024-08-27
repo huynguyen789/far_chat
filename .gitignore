@@ -1,12 +1,9 @@
 # Ignore .conda folder
 .conda/
-
 # Ignore .streamlit folder
 .streamlit/
-
 # Ignore .env file
 .env
-
 # Additional common ignores for Python projects
 __pycache__/
 *.py[cod]
@@ -18,11 +15,12 @@ build/
 *.log
 *.docx
 Sol_89303023REI000090_Amd_0004.txt
-
-# Unignore everything in data except PDFs
-
-
-# Other ignore rules...
-
 # Ignore PDFs everywhere
 **/*.pdf
+
+# Include data folder
+!data/
+!data/**
+
+# But still ignore PDFs in data folder
+data/**/*.pdf
