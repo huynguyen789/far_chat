@@ -20,9 +20,7 @@ build/
 Sol_89303023REI000090_Amd_0004.txt
 
 # Unignore everything in data except PDFs
-!data/
-!data/**/*
-data/**/*.pdf
+
 
 # Other ignore rules...
 
