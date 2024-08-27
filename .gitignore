@@ -7,7 +7,7 @@
 # Ignore .env file
 .env
 
-# Additional common ignores for Python projects (optional, but recommended)
+# Additional common ignores for Python projects
 __pycache__/
 *.py[cod]
 *.so
@@ -16,8 +16,14 @@ __pycache__/
 dist/
 build/
 *.log
-*.pdf
 *.docx
 Sol_89303023REI000090_Amd_0004.txt
 
-data/
+# Unignore everything in data
+!data/
+!data/**/*
+
+# Other ignore rules...
+
+# Ignore PDFs everywhere, including in the data folder
+**/*.pdf
