@@ -148,8 +148,8 @@ def generate_answer(query: str, relevant_data: str, llm: ChatOpenAI):
 
         The answer should have 3 parts:
         1. An easy to understand answer/explanation with a concise, short example.
-        2. The exact wording and format from the original document, ensuring the full section is included (for citing purposes).
-        3. If the content refers to any other section or clause(s), state it out to the user. ex: "This section also references: ...."
+        2. If the content refers to any other section or clause(s), state it out to the user. ex: "This section also references: ...."
+        3. The exact wording and format from the original document, ensuring the full section is included (for citing purposes).
 
         Relevant data:
         {relevant_data}

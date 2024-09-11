@@ -4,6 +4,9 @@
 .streamlit/
 # Ignore .env file
 .env
+
+#ignore the ven folder:
+venv/
 # # Additional common ignores for Python projects
 # __pycache__/
 # *.py[cod]
